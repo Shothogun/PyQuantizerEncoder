@@ -3,6 +3,7 @@ import bitstream as bstr
 from PIL import Image
 import numpy as np
 from scipy import integrate
+import math as mth
 
 def convert_from_bool(x):
   if x:
@@ -244,6 +245,29 @@ class CIQADecoder:
   
     return
 
+  def MSE(self, original_file, decompressed_file):
+    image_test = Image.open(decompressed_file)
+    image_reference = Image.open(original_file)
+
+    mse = 0
+
+    height, width = image_test.size
+
+    for i in range(height):
+      for j in range(width):
+        I = image_test.getpixel((i,j))
+        R = image_reference.getpixel((i,j))
+        mse += (I-R)**2
+
+    mse /= (height*width)
+
+    return mse
+
+  def PSNR(self, mse):
+    psnr = (2**(self.n_bits[self.M]) - 1)**2
+    psnr /= mse
+    psnr = 10*mth.log(psnr,10)
+    return psnr
 
 def main():
   if len(sys.argv) < 2:
@@ -258,6 +282,14 @@ def main():
   decoder = CIQADecoder()
   decoder.read_file(quantizer.compressed_file)
   decoder.decode()
+
+  original_file = quantizer.image_file
+  decompressed_file = decoder.compressed_file[:-5:]+"_reconstructed.bmp"
+
+  mse = decoder.MSE(original_file, decompressed_file)
+  print("MSE  value:", mse)
+  psnr = decoder.PSNR(mse)
+  print("PSNR value:", psnr)
 
 if __name__ == "__main__":
   main()
