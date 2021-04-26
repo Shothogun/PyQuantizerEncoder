@@ -264,7 +264,7 @@ class CIQADecoder:
     return mse
 
   def PSNR(self, mse):
-    psnr = (2**(self.n_bits[self.M]) - 1)**2
+    psnr = 255*255
     psnr /= mse
     psnr = 10*mth.log(psnr,10)
     return psnr
