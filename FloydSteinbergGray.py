@@ -1,9 +1,9 @@
+import numpy as np
 import sys
 import bitstream as bstr
 from PIL import Image
-import numpy as np
-from scipy import integrate
 import math as mth
+
 
 def convert_from_bool(x):
   if x:
@@ -12,105 +12,80 @@ def convert_from_bool(x):
   else:
     return '0'
 
-class CIQAEncoder:
+class FlyStgEncoder:
   def __init__(self):
     self.image_file = sys.argv[1]
-    self.compressed_file = self.image_file[:-4:]+".CIQA"
+    self.compressed_file = self.image_file[:-4:]+".FSA"
 
-    self.N = int(input("Enter the N:\t"))
     self.M = int(input("Enter the M:\t"))
+    self.dithering_flag = int(input("Use dithering(1 or 0)?\t"))
     self.image = Image.open(self.image_file)
 
     heigth, width = self.image.size
-    self.n_blocks = (heigth*width)//(self.N*self.N)
-
-    self.block = np.zeros([self.N,self.N], dtype = np.int32)
-    self.b = []
-    self.y = []
-    self.min = np.zeros(self.n_blocks, dtype = np.int32)
-    self.max = np.zeros(self.n_blocks, dtype = np.int32)
-    self.optimal_delta = np.zeros(self.n_blocks, dtype = np.int32)
+    
     self.bitstream = bstr.BitStream()
     self.unused_bits = 0
 
     self.convert_bin = {
-      2:'{0:01b}',
-      4:'{0:02b}',
       8:'{0:03b}',
       16:'{0:04b}'
     }
 
-  def compute_delta(self):
-    offset_x = 0
-    offset_y = 0
+  def initialize_image_matrix(self):
+    image_object = Image.open(self.image_file)
+    heigth, width = image_object.size
+    self.image_matrix = np.zeros((heigth,width), dtype="object")
 
+    for i in range(heigth):
+      for j in range(width):
+        self.image_matrix[i,j] = image_object.getpixel((i,j))
+
+    self.image_matrix = np.array(self.image_matrix, dtype="object")
+
+  def dithering(self):
+    self.initialize_image_matrix()
     heigth, width = self.image.size
 
-    # Iterate each NxN block from image
-    for i_block in range(self.n_blocks):
-      # Image NxN Block
-      for i in range(self.N):
-        for j in range(self.N):
-          self.block[i][j] = np.int32(self.image.getpixel((i+offset_x,j+offset_y)))
+    delta = round(256/self.M)
+    y = np.arange(self.M)*delta
 
-      offset_x += self.N
+    for i in range(heigth-1):
+      for j in range(width-1):
+        oldpixel = self.image_matrix[i,j]
+        newpixel = y[np.where(y<=oldpixel)[0][-1]]
+        self.image_matrix[i,j] = newpixel
+        if self.dithering_flag:
+          quant_error = oldpixel - newpixel
+          self.image_matrix[i,j + 1] = self.image_matrix[i,j + 1] + quant_error * (7 / 16)
+          self.image_matrix[i + 1,j - 1] = self.image_matrix[i + 1,j - 1] + quant_error * (3 / 16)
+          self.image_matrix[i + 1,j    ] = self.image_matrix[i + 1,j] + quant_error * (5 / 16)
+          self.image_matrix[i + 1,j + 1] = self.image_matrix[i + 1,j + 1] + quant_error * (1 / 16)
 
-      if offset_x == width:
-        offset_x = 0
-        offset_y += self.N
-
-      self.min[i_block] = np.min(self.block)
-      # print(np.min(self.block), np.max(self.block))
-      self.max[i_block] = np.max(self.block)
-  
   def quantize(self):
     convert2bool = lambda x: True if x == '1' else False
-    offset_x = 0
-    offset_y = 0
-
     heigth, width = self.image.size
 
-    # Header writing: N,M, blocks number, (min, max), content
+    # Header writing: heigth, width, M
     bin_heigth = '{0:016b}'.format(heigth)
     bin_width = '{0:016b}'.format(width)
-    bin_N = '{0:08b}'.format(self.N)
     bin_M = '{0:08b}'.format(self.M)
-    bin_n_blocks = '{0:016b}'.format(self.n_blocks)
     self.bitstream.write(list(map(convert2bool, bin_heigth)))
     self.bitstream.write(list(map(convert2bool, bin_width)))
-    self.bitstream.write(list(map(convert2bool, bin_N)))
     self.bitstream.write(list(map(convert2bool, bin_M)))
-    self.bitstream.write(list(map(convert2bool, bin_n_blocks)))
 
-    for i in range(self.n_blocks):
-      bin_min_value = '{0:08b}'.format(self.min[i])
-      self.bitstream.write(list(map(convert2bool, bin_min_value)))
-      bin_max_value = '{0:08b}'.format(self.max[i])
-      self.bitstream.write(list(map(convert2bool, bin_max_value)))
+    delta = round(256/self.M)
+    y = np.arange(self.M)*delta
 
-    # Iterate each NxN block from image
-    for i_block in range(self.n_blocks):
-      min_value = self.min[i_block]
-      max_value = self.max[i_block]
-      delta = round((max_value - min_value)/self.M)
-
-      y = np.arange(self.M)*delta + min_value
-
-      # Image NxN Block
-      for i in range(self.N):
-        for j in range(self.N):
-          pixel_value = np.int32(self.image.getpixel((i+offset_x,j+offset_y)))
-          code = np.where(y<=pixel_value)[0][-1]
-          bin_code = self.convert_bin[self.M].format(code)
-          self.bitstream.write(list(map(convert2bool, bin_code)))
-
-      offset_x += self.N
-      if offset_x == width:
-        offset_x = 0
-        offset_y += self.N
+    # Image encoded
+    for i in range(heigth):
+      for j in range(width):
+        pixel_value = self.image_matrix[i,j]
+        code = np.where(y<=pixel_value)[0][-1]
+        bin_code = self.convert_bin[self.M].format(code)
+        self.bitstream.write(list(map(convert2bool, bin_code)))
 
     return
-  
+
   def write_file(self):
     f = open(self.compressed_file, "wb")
     self.unused_bits = len(self.bitstream)%8
@@ -136,27 +111,21 @@ class CIQAEncoder:
 
     f.close()
 
-class CIQADecoder:
+class FlyStgDecoder:
   def __init__(self):
     self.bitstream = bstr.BitStream()
     self.compressed_file = ""
-    self.N = 0
     self.M = 0
-    self.n_blocks = 0
     self.unused_bits = 0
     self.image_codes = []
-    self.min = []
-    self.max = []
 
     self.n_bits = {
-      2:1,
-      4:2,
       8:3,
       16:4
     }
 
   def read_bits(self, size):
-    bits = ""    
+    bits = ""
     for _ in range(size):
       bits += convert_from_bool(self.bitstream.read(bool,1)[0])
     return bits
@@ -185,23 +154,9 @@ class CIQADecoder:
     bits = self.read_bits(16)
     self.width = int(bits,2)
 
-    # Read N
-    bits = self.read_bits(8)
-    self.N = int(bits,2)
-
     # Read M
     bits = self.read_bits(8)
     self.M = int(bits,2)
-
-    # Read N blocks
-    bits = self.read_bits(16)
-    self.n_blocks = int(bits,2)
-
-    for i in range(self.n_blocks):
-      bits = self.read_bits(8)
-      self.min.append(int(bits,2))
-      bits = self.read_bits(8)
-      self.max.append(int(bits,2))
 
     code=""
     for _ in range(len(self.bitstream) - self.unused_bits):
@@ -215,33 +170,20 @@ class CIQADecoder:
     return
 
   def decode(self):
-    offset_x = 0
-    offset_y = 0
-    n_pixel = 0
     reconstructed_image = Image.new('P',(self.width,self.heigth))
 
-    # Iterate each NxN block from image
-    for i_block in range(self.n_blocks):
-      min_value = self.min[i_block]
-      max_value = self.max[i_block]
-      delta = round((max_value - min_value)/self.M)
+    delta = round(256/self.M)
 
-      y = np.arange(self.M)*delta + min_value
+    y = np.arange(self.M)*delta
 
-      # Image NxN Block
-      for i in range(self.N):
-        for j in range(self.N):
-          pixel_value = int(y[self.image_codes[n_pixel]])
-          reconstructed_image.putpixel((i+offset_x,j+offset_y), pixel_value)
-          n_pixel +=1
+    # Image NxN Block
+    for i in range(self.heigth):
+      for j in range(self.width):
+        pixel_value = int(y[self.image_codes[i*self.width+j]])
+        reconstructed_image.putpixel((i,j), pixel_value)
 
-      offset_x += self.N
-      if offset_x == self.width:
-        offset_x = 0
-        offset_y += self.N
+    reconstructed_image.save(self.compressed_file[:-4:]+"_reconstructed.bmp")
 
-    reconstructed_image.save(self.compressed_file[:-5:]+"_reconstructed.bmp")
-  
     return
 
   def MSE(self, original_file, decompressed_file):
@@ -268,22 +210,23 @@ class CIQADecoder:
     psnr = 10*mth.log(psnr,10)
     return psnr
 
+
 def main():
   if len(sys.argv) < 2:
     print("Missing image file path parameter!")
     return
   
-  quantizer = CIQAEncoder()
-  quantizer.compute_delta()
+  quantizer = FlyStgEncoder()
+  quantizer.dithering()
   quantizer.quantize()
   quantizer.write_file()
 
-  decoder = CIQADecoder()
+  decoder = FlyStgDecoder()
   decoder.read_file(quantizer.compressed_file)
   decoder.decode()
 
   original_file = quantizer.image_file
-  decompressed_file = decoder.compressed_file[:-5:]+"_reconstructed.bmp"
+  decompressed_file = decoder.compressed_file[:-4:]+"_reconstructed.bmp"
 
   mse = decoder.MSE(original_file, decompressed_file)
   print("MSE  value:", mse)

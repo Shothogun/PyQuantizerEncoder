@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+from PIL import Image
+
 
 x1=[2,4,8,16]
 x2=[2,4,8,16]
@@ -16,3 +18,14 @@ plt.plot(x2,y2,'r.')
 plt.plot(x3,y3,'g.')
 plt.plot(x4,y4,'m.')
 plt.show()
+
+reconstructed_image = Image.new('RGB',(512,512))
+
+# Iterate each Pixel
+for i in range(512):
+  for j in range(512):
+    pixel_value = (0,0,255)
+    reconstructed_image.putpixel((i,j), pixel_value)
+  
+reconstructed_image.save("test.bmp")
+  

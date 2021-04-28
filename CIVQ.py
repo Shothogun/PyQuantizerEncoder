@@ -38,7 +38,7 @@ class CIVQEncoder:
 
     # Training set
     self.x = []
-    self.x_train_size = 512
+    self.x_train_size = 1024
 
     # Quantization Regions
     self.v = [[] for i in range (self.M)]
@@ -78,19 +78,19 @@ class CIVQEncoder:
     pace = n_blocks//self.x_train_size
     block_side = round(self.L**0.5)
 
-    offset_x = 0
     offset_y = 0
+    offset_x = 0
 
     # Initialize train set
     for i in range(self.x_train_size):
-      block = np.array(self.image_matrix[offset_x:offset_x+block_side, \
-                               offset_y:offset_y+block_side], dtype=np.int32)
+      block = np.array(self.image_matrix[offset_y:offset_y+block_side, \
+                               offset_x:offset_x+block_side], dtype=np.int32)
       self.x.append(block)
 
-      offset_x += (pace*block_side)
-      if offset_x == width:
-        offset_x = 0
-        offset_y += block_side 
+      offset_y += (pace*block_side)
+      if offset_y == width:
+        offset_y = 0
+        offset_x += block_side 
 
     pace = self.x_train_size//self.M
 
@@ -188,22 +188,22 @@ class CIVQEncoder:
     
     block_side = round(self.L**0.5)
 
-    offset_x = 0
     offset_y = 0
+    offset_x = 0
 
     self.set_header()
 
     # Iterate each L size block from image
     for i in range(n_blocks):
-      block = np.array(self.image_matrix[offset_x:offset_x+block_side, \
-                               offset_y:offset_y+block_side], dtype=np.int32)
+      block = np.array(self.image_matrix[offset_y:offset_y+block_side, \
+                               offset_x:offset_x+block_side], dtype=np.int32)
 
       self.best_code_vector(block)
 
-      offset_x += (block_side)
-      if offset_x == width:
-        offset_x = 0
-        offset_y += block_side 
+      offset_y += (block_side)
+      if offset_y == width:
+        offset_y = 0
+        offset_x += block_side 
 
   def write_file(self):
     f = open(self.compressed_file, "wb")
@@ -316,8 +316,8 @@ class CIVQDecoder:
     return
 
   def decode(self):
-    offset_x = 0
     offset_y = 0
+    offset_x = 0
     reconstructed_image = Image.new('P',(self.width,self.heigth))
 
     block_side = round((self.L)**0.5)
@@ -331,12 +331,12 @@ class CIVQDecoder:
       for i in range(block_side):
         for j in range(block_side):
           pixel_value = int(code_vector[i][j])
-          reconstructed_image.putpixel((i+offset_x,j+offset_y), pixel_value)
+          reconstructed_image.putpixel((i+offset_y,j+offset_x), pixel_value)
 
-      offset_x += block_side
-      if offset_x == self.width:
-        offset_x = 0
-        offset_y += block_side
+      offset_y += block_side
+      if offset_y == self.width:
+        offset_y = 0
+        offset_x += block_side
       
     reconstructed_image.save(self.compressed_file[:-5:]+"_reconstructed.bmp")
   
