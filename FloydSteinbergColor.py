@@ -54,16 +54,17 @@ class FlyStgEncoder:
     for i in range(heigth-1):
       for j in range(width-1):
         oldpixel = self.image_matrix[:,i,j].copy()
+
+        oldpixel[0] = max(oldpixel[0],0)
+        oldpixel[1] = max(oldpixel[1],0)
+        oldpixel[2] = max(oldpixel[2],0)
+
         newpixel = np.array([y[np.where(b<=oldpixel[0])[0][-1]],
                     y[np.where(b<=oldpixel[1])[0][-1]],
                     y[np.where(b<=oldpixel[2])[0][-1]]], dtype="object")
         self.image_matrix[:,i,j] = newpixel.copy()
         if self.dithering_flag:
           quant_error = np.array(oldpixel - newpixel, dtype="object")
-
-          quant_error[0] = max(quant_error[0],0)
-          quant_error[1] = max(quant_error[1],0)
-          quant_error[2] = max(quant_error[2],0)
           
           self.image_matrix[:, i,j + 1] = self.image_matrix[:, i,j + 1] + quant_error * (7 / 16)
           self.image_matrix[:, i + 1,j - 1] = self.image_matrix[:, i + 1,j - 1] + quant_error * (3 / 16)
@@ -91,6 +92,9 @@ class FlyStgEncoder:
       for j in range(width):
         for dim in range(3):
           pixel_value = self.image_matrix[dim,i,j]
+
+          pixel_value = max(pixel_value,0)
+
           code = np.where(b<=pixel_value)[0][-1]
           bin_code = self.convert_bin[self.M].format(code)
           self.bitstream.write(list(map(convert2bool, bin_code)))
