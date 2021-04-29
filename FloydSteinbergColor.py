@@ -26,6 +26,8 @@ class FlyStgEncoder:
     self.unused_bits = 0
 
     self.convert_bin = {
+      2:'{0:01b}',
+      4:'{0:02b}',
       8:'{0:03b}',
       16:'{0:04b}'
     }
@@ -46,22 +48,29 @@ class FlyStgEncoder:
     heigth, width = self.image.size
 
     delta = round(256/self.M)
-    y = np.arange(self.M)*delta
-
+    i_range = i = np.arange(1,self.M+1)
+    b = np.arange(self.M)*delta
+    y = ((2*i_range - 1)/2)*delta
     for i in range(heigth-1):
       for j in range(width-1):
         oldpixel = self.image_matrix[:,i,j].copy()
-        newpixel = np.array([y[np.where(y<=oldpixel[0])[0][-1]],
-                    y[np.where(y<=oldpixel[1])[0][-1]],
-                    y[np.where(y<=oldpixel[2])[0][-1]]], dtype="object")
+        newpixel = np.array([y[np.where(b<=oldpixel[0])[0][-1]],
+                    y[np.where(b<=oldpixel[1])[0][-1]],
+                    y[np.where(b<=oldpixel[2])[0][-1]]], dtype="object")
         self.image_matrix[:,i,j] = newpixel.copy()
         if self.dithering_flag:
           quant_error = np.array(oldpixel - newpixel, dtype="object")
+
+          quant_error[0] = max(quant_error[0],0)
+          quant_error[1] = max(quant_error[1],0)
+          quant_error[2] = max(quant_error[2],0)
+          
           self.image_matrix[:, i,j + 1] = self.image_matrix[:, i,j + 1] + quant_error * (7 / 16)
           self.image_matrix[:, i + 1,j - 1] = self.image_matrix[:, i + 1,j - 1] + quant_error * (3 / 16)
           self.image_matrix[:, i + 1,j    ] = self.image_matrix[:, i + 1,j] + quant_error * (5 / 16)
           self.image_matrix[:, i + 1,j + 1] = self.image_matrix[:, i + 1,j + 1] + quant_error * (1 / 16)
 
+          
   def quantize(self):
     convert2bool = lambda x: True if x == '1' else False
     heigth, width = self.image.size
@@ -75,14 +84,14 @@ class FlyStgEncoder:
     self.bitstream.write(list(map(convert2bool, bin_M)))
 
     delta = round(256/self.M)
-    y = np.arange(self.M)*delta
+    b = np.arange(self.M)*delta
 
     # Image encoded
     for i in range(heigth):
       for j in range(width):
         for dim in range(3):
           pixel_value = self.image_matrix[dim,i,j]
-          code = np.where(y<=pixel_value)[0][-1]
+          code = np.where(b<=pixel_value)[0][-1]
           bin_code = self.convert_bin[self.M].format(code)
           self.bitstream.write(list(map(convert2bool, bin_code)))
 
@@ -122,6 +131,8 @@ class FlyStgDecoder:
     self.image_codes = []
 
     self.n_bits = {
+      2:1,
+      4:2,
       8:3,
       16:4
     }
@@ -173,10 +184,10 @@ class FlyStgDecoder:
 
   def decode(self):
     reconstructed_image = Image.new('RGB',(self.width,self.heigth))
-
+    
     delta = round(256/self.M)
-
-    y = np.arange(self.M)*delta
+    i_range = i = np.arange(1,self.M+1)
+    y = ((2*i_range - 1)/2)*delta
 
     pixel_value=[0,0,0]
     n_pixel = 0

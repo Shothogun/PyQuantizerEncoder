@@ -47,18 +47,20 @@ class FlyStgEncoder:
     heigth, width = self.image.size
 
     delta = round(256/self.M)
-    y = np.arange(self.M)*delta
+    i_range = i = np.arange(1,self.M+1)
+    b = np.arange(self.M)*delta
+    y = ((2*i_range - 1)/2)*delta
 
     for i in range(heigth-1):
       for j in range(width-1):
         oldpixel = self.image_matrix[i,j]
-        newpixel = y[np.where(y<=oldpixel)[0][-1]]
+        newpixel = y[np.where(b<=oldpixel)[0][-1]]
         self.image_matrix[i,j] = newpixel
         if self.dithering_flag:
           quant_error = oldpixel - newpixel
           self.image_matrix[i,j + 1] = self.image_matrix[i,j + 1] + quant_error * (7 / 16)
           self.image_matrix[i + 1,j - 1] = self.image_matrix[i + 1,j - 1] + quant_error * (3 / 16)
-          self.image_matrix[i + 1,j    ] = self.image_matrix[i + 1,j] + quant_error * (5 / 16)
+          self.image_matrix[i + 1,j] = self.image_matrix[i + 1,j] + quant_error * (5 / 16)
           self.image_matrix[i + 1,j + 1] = self.image_matrix[i + 1,j + 1] + quant_error * (1 / 16)
 
   def quantize(self):
@@ -74,13 +76,13 @@ class FlyStgEncoder:
     self.bitstream.write(list(map(convert2bool, bin_M)))
 
     delta = round(256/self.M)
-    y = np.arange(self.M)*delta
-
+    b = np.arange(self.M)*delta
+    
     # Image encoded
     for i in range(heigth):
       for j in range(width):
         pixel_value = self.image_matrix[i,j]
-        code = np.where(y<=pixel_value)[0][-1]
+        code = np.where(b<=pixel_value)[0][-1]
         bin_code = self.convert_bin[self.M].format(code)
         self.bitstream.write(list(map(convert2bool, bin_code)))
 
@@ -173,15 +175,16 @@ class FlyStgDecoder:
     reconstructed_image = Image.new('P',(self.width,self.heigth))
 
     delta = round(256/self.M)
-
-    y = np.arange(self.M)*delta
+    i_range = i = np.arange(1,self.M+1)
+    y = ((2*i_range - 1)/2)*delta
+    n_pixel=0
 
     # Image NxN Block
     for i in range(self.heigth):
       for j in range(self.width):
-        pixel_value = int(y[self.image_codes[i*self.width+j]])
+        pixel_value = int(y[self.image_codes[n_pixel]])
         reconstructed_image.putpixel((i,j), pixel_value)
-
+        n_pixel += 1
     reconstructed_image.save(self.compressed_file[:-4:]+"_reconstructed.bmp")
 
     return
