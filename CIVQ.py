@@ -21,13 +21,13 @@ def convert_from_bool(x):
 
 class CIVQEncoder:
   def __init__(self):
-    self.image_file = sys.argv[1]
+    self.image_file = sys.argv[3]
 
     # Codevector size
-    self.L = int(input("Enter the L:\t"))
+    self.L = int(sys.argv[1])
 
     # Codebook size
-    self.M = int(input("Enter the M:\t"))
+    self.M = int(sys.argv[2])
 
     self.compressed_file = self.image_file[:-4:]+".CIVQ"
 
@@ -372,9 +372,9 @@ def main():
     return
   
   encoder = CIVQEncoder()
-  encoder.lbg_algorithm()
-  encoder.quantization()
-  encoder.write_file()
+  # encoder.lbg_algorithm()
+  # encoder.quantization()
+  # encoder.write_file()
 
   decoder = CIVQDecoder()
   decoder.read_file(encoder.compressed_file)

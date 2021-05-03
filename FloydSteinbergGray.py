@@ -14,10 +14,10 @@ def convert_from_bool(x):
 
 class FlyStgEncoder:
   def __init__(self):
-    self.image_file = sys.argv[1]
+    self.image_file = sys.argv[2]
     self.compressed_file = self.image_file[:-4:]+".FSA"
 
-    self.M = int(input("Enter the M:\t"))
+    self.M = int(sys.argv[1])
     self.dithering_flag = int(input("Use dithering(1 or 0)?\t"))
     self.image = Image.open(self.image_file)
 
@@ -235,6 +235,6 @@ def main():
   print("MSE  value:", mse)
   psnr = decoder.PSNR(mse)
   print("PSNR value:", psnr)
-
+  
 if __name__ == "__main__":
   main()

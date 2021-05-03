@@ -21,13 +21,13 @@ def convert_from_bool(x):
 
 class CIMapEncoder:
   def __init__(self):
-    self.image_file = sys.argv[1]
+    self.image_file = sys.argv[2]
 
     # Codevector size
     self.L = 3
 
     # Codebook size
-    self.M = int(input("Enter the M:\t"))
+    self.M = int(sys.argv[1]) #int(input("Enter the M:\t"))
 
     self.compressed_file = self.image_file[:-4:]+".CIMap"
 
@@ -331,7 +331,7 @@ class CIMapDecoder:
     return psnr
 
 def main():
-  if len(sys.argv) < 2:
+  if len(sys.argv) < 3:
     print("Missing image file path parameter!")
     return
   
@@ -345,12 +345,13 @@ def main():
   decoder.decode()
 
   original_file = encoder.image_file
-  decompressed_file = decoder.compressed_file[:-5:]+"_reconstructed.bmp"
+  decompressed_file = decoder.compressed_file[:-6:]+"_reconstructed.bmp"
 
   mse = decoder.MSE(original_file, decompressed_file)
   print("MSE  value:", mse)
   psnr = decoder.PSNR(mse)
   print("PSNR value:", psnr)
+
 
 if __name__ == "__main__":
   main()

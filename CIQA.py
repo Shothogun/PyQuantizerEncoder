@@ -14,11 +14,11 @@ def convert_from_bool(x):
 
 class CIQAEncoder:
   def __init__(self):
-    self.image_file = sys.argv[1]
+    self.image_file = sys.argv[3]
     self.compressed_file = self.image_file[:-4:]+".CIQA"
 
-    self.N = int(input("Enter the N:\t"))
-    self.M = int(input("Enter the M:\t"))
+    self.N = int(sys.argv[1])
+    self.M = int(sys.argv[2])
     self.image = Image.open(self.image_file)
 
     heigth, width = self.image.size
@@ -269,7 +269,7 @@ class CIQADecoder:
     return psnr
 
 def main():
-  if len(sys.argv) < 2:
+  if len(sys.argv) < 3:
     print("Missing image file path parameter!")
     return
   
